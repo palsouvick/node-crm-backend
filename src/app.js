@@ -8,17 +8,21 @@ const authRoutes = require("./routes/authRoutes");
 
 const app = express();
 
-app.use(cors([
-  { origin: 'http://localhost:3000', // Replace with your frontend URL
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
-    credentials: true,
-  },
-]));
+// ✅ Correct CORS usage
+app.use(cors({
+  origin: "http://localhost:3000",
+  methods: ["GET", "POST", "PUT", "DELETE"],
+  credentials: true
+}));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 app.use('/api/auth', authRoutes);
 app.use('/api', require('./routes/customerRoutes'));
+app.use('/api', require('./routes/leadRoutes'));
+app.use('/api', require('./routes/followUpRoutes'));
+app.use('/api', require('./routes/userRoutes'));
 
 app.get("/", (req, res) => {
   res.send("CRM Backend Running");

@@ -1,14 +1,14 @@
 const ActivityLog = require("../models/ActivityLog");
 
 const logActivity = async ({
-  user,
+  userId,
   action,
   module,
   referenceId,
   description,
 }) => {
   await ActivityLog.create({
-    user,
+    userId,
     action,
     module,
     referenceId,

@@ -1,6 +1,7 @@
 const Customer = require("../models/Customer");
 const { Parser } = require("json2csv");
 const mongoose = require("mongoose");
+const logActivity = require("../utils/logActivity");
 
 // Create a new customer
 exports.createCustomer = async (req, res) => {
@@ -19,7 +20,7 @@ exports.createCustomer = async (req, res) => {
             notes
         });
           await logActivity({
-            user: req.user._id,
+            userId: req.user._id,
             action: "CREATED",
             module: "customer",
             referenceId: customer._id,
@@ -37,7 +38,7 @@ exports.createCustomer = async (req, res) => {
 exports.getCustomers = async (req, res) => {
     try {
         const page = Number(req.query.page) || 1;
-        const limit = Number(req.query.limit) || 10;
+        const limit = Number(req.query.limit) || 5;
         const skip = (page - 1) * limit;
 
         const {
@@ -142,7 +143,7 @@ exports.updateCustomer = async (req, res) => {
             return res.status(404).json({ message: "Customer not found" });
         }
         await logActivity({
-            user: req.user._id,
+            userId: req.user._id,
             action: "UPDATED",
             module: "customer",
             referenceId: customer._id,
@@ -163,7 +164,7 @@ exports.deleteCustomer = async (req, res) => {
             return res.status(404).json({ message: "Customer not found" });
         }
          await logActivity({
-            user: req.user._id,
+            userId: req.user._id,
             action: "DELETED",
             module: "customer",
             referenceId: customer._id,
@@ -184,7 +185,7 @@ exports.restoreCustomer = async (req, res) => {
             return res.status(404).json({ message: "Customer not found" });
         }
         await logActivity({
-            user: req.user._id,
+            userId: req.user._id,
             action: "RESTORED",
             module: "customer",
             referenceId: customer._id,

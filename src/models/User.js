@@ -14,6 +14,7 @@ const UserSchema = new mongoose.Schema({
       type: Date,
       required: false,
     },
+    isDeleted: {type: Boolean, default: false,}
 }, {timestamps: true});
 
 module.exports = mongoose.model("User", UserSchema);

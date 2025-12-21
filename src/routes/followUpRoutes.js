@@ -18,3 +18,5 @@ router.put('/follow-up/:id', authorize('admin', 'sales', 'support'), updateFollo
 router.delete('/follow-up/:id', authorize('admin'), deleteFollowUp);
 router.put('/follow-up/:id/complete', authorize('admin', 'sales', 'support'), completeFollowUp);
 router.put('/follow-up/:id/reschedule', authorize('admin', 'sales', 'support'), rescheduleFollowUp);
+
+module.exports = router;

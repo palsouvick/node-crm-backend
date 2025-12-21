@@ -17,3 +17,5 @@ router.put('/lead/:id/assign', authorize('admin', 'sales'), assignLead);
 router.get('/lead/:id', getLeadById);
 router.put('/lead/:id', authorize('admin', 'sales'), updateLead);
 router.delete('/lead/:id', authorize('admin'), deleteLead);
+
+module.exports = router;

@@ -8,3 +8,5 @@ const ActivityLogSchema = new mongoose.Schema({
     details: { type: mongoose.Schema.Types.Mixed },
     description: { type: String, required: false }
 }, { timestamps: true });
+
+module.exports = mongoose.model('ActivityLog', ActivityLogSchema);
