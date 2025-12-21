@@ -3,17 +3,65 @@ const User = require("../models/User");
 // get all users
 exports.getUsers = async (req, res) => {
   try {
-    const users = await User.find();
-    res.json(users);
+    const page = Number(req.query.page) || 1;
+    const limit = Number(req.query.limit) || 5;
+    const skip = (page - 1) * limit;
+
+    const { search } = req.query;
+
+    // ✅ Base filter
+    const filter = {
+      $or: [
+        { isDeleted: false },
+        { isDeleted: { $exists: false } }
+      ]
+    };
+
+    // ✅ Search filter
+    if (search) {
+      filter.$and = [
+        {
+          $or: [
+            { name: { $regex: search, $options: "i" } },
+            { phone: { $regex: search, $options: "i" } },
+            { email: { $regex: search, $options: "i" } }
+          ]
+        }
+      ];
+    }
+
+    // ✅ Fetch users + total count
+    const [users, total] = await Promise.all([
+      User.find(filter)
+        .select("-password")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+
+      User.countDocuments(filter)
+    ]);
+
+    res.json({
+      data: users,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit)
+      }
+    });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("Get Users Error:", error);
+    res.status(500).json({ message: "Server error" });
   }
 };
+
 
 // Create a new user
 exports.createUser = async (req, res) => {
   try {
-    const { name, email, phone, status, password, role, dob, metadata } = req.body;
+    const { name, email, phone, status, password, role, dob, metadata } =
+      req.body;
     if (!name || !email || !password || !role) {
       return res.status(400).json({ message: "All fields are required" });
     }
@@ -21,7 +69,16 @@ exports.createUser = async (req, res) => {
     if (existingUser) {
       return res.status(400).json({ message: "User already exists" });
     }
-    const user = new User({ name, email, phone, status, password, role, dob, metadata });
+    const user = new User({
+      name,
+      email,
+      phone,
+      status,
+      password,
+      role,
+      dob,
+      metadata,
+    });
     await user.save();
     res.status(201).json({ message: "User created successfully", user });
   } catch (error) {
