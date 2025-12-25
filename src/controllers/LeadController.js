@@ -4,19 +4,21 @@ const Lead = require("../models/Lead");
 // Create a new lead
 exports.createLead = async (req, res) => {
   try {
-    const { name, email, phone, source, status, assignedTo, notes } = req.body;
-    if (!name || !email) {
+    const { customar, title, description, status, expectedValue, assignedTo, remarks, source } =
+      req.body;
+    if (!customar) {
       return res.status(400).json({ message: "Name and email are required" });
     }
     const lead = await Lead.create({
-      name,
-      email,
-      phone,
-      source,
-      status,
-      assignedTo,
-      createdBy: req.user._id,
-      notes,
+      customar, // Customer ID
+      title,
+      description,
+      status: status || "new",
+      expectedValue: expectedValue || 0,
+      assignedTo: assignedTo || null,
+      remarks,
+      source: source || "website",
+      createdBy: req.user._id, // from JWT
     });
     await lead.save();
     res.status(201).json({ message: "Lead created successfully", lead });
@@ -29,10 +31,29 @@ exports.createLead = async (req, res) => {
 // Get all leads
 exports.getLeads = async (req, res) => {
   try {
-    const leads = await Lead.find()
-      .populate("assignedTo", "name email")
-      .populate("createdBy", "name email");
-    res.json({ leads });
+    const page = Number(req.query.page) || 1;
+    const limit = Number(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    const [leads, total] = await Promise.all([
+      Lead.find()
+        .populate("assignedTo", "name email")
+        .populate("createdBy", "name email")
+        .populate("customar", "name email")
+        .skip(skip)
+        .limit(limit),
+      Lead.countDocuments(),
+    ]);
+
+    res.json({
+      data: leads,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Server error" });
@@ -41,9 +62,16 @@ exports.getLeads = async (req, res) => {
 
 exports.getLeadById = async (req, res) => {
   try {
+    const page = Number(req.query.page) || 1;
+    const limit = Number(req.query.limit) || 10;
+    const skip = (page - 1) * 10;
+
     const lead = await Lead.findById(req.params.id)
+      .skip(skip)
+      .limit(limit)
       .populate("assignedTo", "name email")
-      .populate("createdBy", "name email");
+      .populate("createdBy", "name email")
+      .populate("customar", "name email phone company");
     if (!lead) {
       return res.status(404).json({ message: "Lead not found" });
     }
@@ -139,7 +167,7 @@ exports.assignLead = async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: "Assigned user not found" });
     }
-    
+
     // 3️⃣ Update the lead's assignedTo field
     const lead = await Lead.findByIdAndUpdate(
       id,

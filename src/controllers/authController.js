@@ -51,7 +51,7 @@ exports.login = async (req, res) => {
         // Create and return JWT
         const payload = { userId: user.id };
         const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '1h' });
-        res.json({ token });
+        res.json({ token,user });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: "Server error" });
@@ -60,6 +60,7 @@ exports.login = async (req, res) => {
 
 exports.getProfile = async (req, res) => {
     try {
+        console.log(req.user);
         const user = await User.findById(req.user._id).select('-password');
         if (!user) {
             return res.status(404).json({ message: "User not found" });
