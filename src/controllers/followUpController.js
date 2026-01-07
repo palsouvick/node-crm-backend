@@ -28,7 +28,7 @@ exports.getFollowUps = async (req, res) => {
     const filter = { isDeleted: false };
 
     if (req.query.assignedTo) filter.assignedTo = req.query.assignedTo;
-    if (req.query.status) filter.status = req.query.status;
+    if (req.query.status) filter.followUpStatus = req.query.status;
 
     const followUps = await FollowUp.find(filter)
       .populate("customer", "name email phone")

@@ -11,12 +11,12 @@ const { createFollowUp,
 const { protect, authorize } = require('../middlewares/authMiddleware');
 
 router.use(protect);
-router.post('/follow-up', authorize('admin', 'sales', 'support'), createFollowUp);
-router.get('/follow-up', getFollowUps);
-router.get('/follow-up/:id', getFollowUpById);
-router.put('/follow-up/:id', authorize('admin', 'sales', 'support'), updateFollowUp);
-router.delete('/follow-up/:id', authorize('admin'), deleteFollowUp);
-router.put('/follow-up/:id/complete', authorize('admin', 'sales', 'support'), completeFollowUp);
-router.put('/follow-up/:id/reschedule', authorize('admin', 'sales', 'support'), rescheduleFollowUp);
+router.post('/follow-ups', authorize('admin', 'sales', 'support'), createFollowUp);
+router.get('/follow-ups', getFollowUps);
+router.get('/follow-ups/:id', getFollowUpById);
+router.put('/follow-ups/:id', authorize('admin', 'sales', 'support'), updateFollowUp);
+router.delete('/follow-ups/:id', authorize('admin'), deleteFollowUp);
+router.put('/follow-ups/:id/complete', authorize('admin', 'sales', 'support'), completeFollowUp);
+router.put('/follow-ups/:id/reschedule', authorize('admin', 'sales', 'support'), rescheduleFollowUp);
 
 module.exports = router;

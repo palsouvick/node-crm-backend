@@ -63,11 +63,11 @@ exports.getCustomers = async (req, res) => {
 
         // Search by name / phone / email
         if (search) {
-        filter.$or = [
-            { name: { $regex: search, $options: "i" } },
-            { phone: { $regex: search, $options: "i" } },
-            { email: { $regex: search, $options: "i" } },
-        ];
+            filter.$or = [
+                { name: { $regex: search, $options: "i" } },
+                { phone: { $regex: search, $options: "i" } },
+                { email: { $regex: search, $options: "i" } },
+            ];
         }
         const [customers, total] = await Promise.all([
             Customer.find(filter)
