@@ -39,7 +39,7 @@ exports.getLeads = async (req, res) => {
       Lead.find()
         .populate("assignedTo", "name email")
         .populate("createdBy", "name email")
-        .populate("customar", "name email")
+        .populate("customar", "name email phone")
         .skip(skip)
         .limit(limit),
       Lead.countDocuments(),
@@ -183,3 +183,13 @@ exports.assignLead = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
+exports.totalLeads = async (req,res) => {
+  try {
+    const total = await Lead.countDocuments();
+    res.json({ total });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server error" });
+  }
+}

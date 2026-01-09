@@ -9,8 +9,7 @@ const FollowUpSchema = new mongoose.Schema(
     },
     lead: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Lead",
-      required: true,
+      ref: "Lead"
     },
     assignedTo: {
       type: mongoose.Schema.Types.ObjectId,

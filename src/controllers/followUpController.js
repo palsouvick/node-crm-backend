@@ -4,15 +4,15 @@ const FollowUp = require("../models/FollowUp");
 // Create a new follow-up
 exports.createFollowUp = async (req, res) => {
   try {
-    const { customer, lead, assignedTo, type, followUpDate, followUpNotes } = req.body;
-    if (!customer || !lead || !assignedTo || !type || !followUpDate || !followUpNotes) {
+    const { customer, assignedTo, type, priority, followUpDate, followUpNotes } = req.body;
+    if (!customer || !assignedTo || !type || !followUpDate || !followUpNotes) {
       return res.status(400).json({ message: "All fields are required" });
     }
     const followUp = await FollowUp.create({
       customer,
-      lead,
       assignedTo,
       type,
+      priority,
       followUpDate,
       followUpNotes,
       createdBy: req.user._id
@@ -25,7 +25,20 @@ exports.createFollowUp = async (req, res) => {
 
 exports.getFollowUps = async (req, res) => {
   try {
+    const page = Number(req.query.page) || 1;
+    const limit = Number(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+    const { status, search } = req.query;
     const filter = { isDeleted: false };
+    // Status filter
+    if (status) {
+      filter.status = status;
+    }
+
+    // Search filter
+    if (search) {
+      filter.name = { $regex: search, $options: "i" };
+    }
 
     if (req.query.assignedTo) filter.assignedTo = req.query.assignedTo;
     if (req.query.status) filter.followUpStatus = req.query.status;
@@ -34,8 +47,17 @@ exports.getFollowUps = async (req, res) => {
       .populate("customer", "name email phone")
       .populate("lead", "status")
       .populate("assignedTo", "name email")
-      .sort({ followUpDate: 1 });
-
+      .sort({ followUpDate: 1 }).skip(skip).limit(limit);
+    const total = await FollowUp.countDocuments(filter);
+    res.status(200).json({
+      data: followUps,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
     res.json(followUps);
   } catch (error) {
     res.status(500).json({ message: "Server error" });

@@ -248,3 +248,12 @@ exports.exportCustomerData = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+exports.totalCustomer = async(req, res) => {
+    try {
+        const total = await Customer.countDocuments({ isDeleted: false });
+        res.json({ total });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Server error" });
+    }
+}
