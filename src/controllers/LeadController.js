@@ -4,13 +4,13 @@ const Lead = require("../models/Lead");
 // Create a new lead
 exports.createLead = async (req, res) => {
   try {
-    const { customar, title, description, status, expectedValue, assignedTo, remarks, source } =
+    const { customer, title, description, status, expectedValue, assignedTo, remarks, source } =
       req.body;
-    if (!customar) {
+    if (!customer) {
       return res.status(400).json({ message: "Name and email are required" });
     }
     const lead = await Lead.create({
-      customar, // Customer ID
+      customer, // Customer ID
       title,
       description,
       status: status || "new",
@@ -39,7 +39,7 @@ exports.getLeads = async (req, res) => {
       Lead.find()
         .populate("assignedTo", "name email")
         .populate("createdBy", "name email")
-        .populate("customar", "name email phone")
+        .populate("customer", "name email phone")
         .skip(skip)
         .limit(limit),
       Lead.countDocuments(),
@@ -71,7 +71,7 @@ exports.getLeadById = async (req, res) => {
       .limit(limit)
       .populate("assignedTo", "name email")
       .populate("createdBy", "name email")
-      .populate("customar", "name email phone company");
+      .populate("customer", "name email phone company");
     if (!lead) {
       return res.status(404).json({ message: "Lead not found" });
     }

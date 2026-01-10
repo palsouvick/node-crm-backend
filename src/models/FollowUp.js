@@ -4,12 +4,12 @@ const FollowUpSchema = new mongoose.Schema(
   {
     customer: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Customer",
-      required: true,
+      ref: "Customer"
     },
     lead: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Lead"
+      ref: "Lead",
+      required: true,
     },
     assignedTo: {
       type: mongoose.Schema.Types.ObjectId,
