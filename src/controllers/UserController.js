@@ -11,10 +11,7 @@ exports.getUsers = async (req, res) => {
 
     // ✅ Base filter
     const filter = {
-      $or: [
-        { isDeleted: false },
-        { isDeleted: { $exists: false } }
-      ]
+      $or: [{ isDeleted: false }, { isDeleted: { $exists: false } }],
     };
 
     // ✅ Search filter
@@ -24,9 +21,9 @@ exports.getUsers = async (req, res) => {
           $or: [
             { name: { $regex: search, $options: "i" } },
             { phone: { $regex: search, $options: "i" } },
-            { email: { $regex: search, $options: "i" } }
-          ]
-        }
+            { email: { $regex: search, $options: "i" } },
+          ],
+        },
       ];
     }
 
@@ -38,7 +35,7 @@ exports.getUsers = async (req, res) => {
         .skip(skip)
         .limit(limit),
 
-      User.countDocuments(filter)
+      User.countDocuments(filter),
     ]);
 
     res.json({
@@ -47,15 +44,14 @@ exports.getUsers = async (req, res) => {
         total,
         page,
         limit,
-        totalPages: Math.ceil(total / limit)
-      }
+        totalPages: Math.ceil(total / limit),
+      },
     });
   } catch (error) {
     console.error("Get Users Error:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
-
 
 // Create a new user
 exports.createUser = async (req, res) => {
@@ -65,10 +61,37 @@ exports.createUser = async (req, res) => {
     if (!name || !email || !password || !role) {
       return res.status(400).json({ message: "All fields are required" });
     }
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({ message: "User already exists" });
+
+    if (await User.findOne({ email })) {
+      return res.status(400).json({
+        message: "Email already exists",
+        field: "email",
+        code: "EMAIL_EXISTS",
+      });
     }
+
+    if (await User.findOne({ phone })) {
+      return res.status(400).json({
+        message: "Phone number already exists",
+        field: "phone",
+        code: "PHONE_EXISTS",
+      });
+    }
+    //we resoter deleted user email
+    if (await User.findOne({ email: email, isDeleted: true })) {
+      deletedUser.isDeleted = false;
+      deletedUser.name = name;
+      deletedUser.phone = phone;
+      deletedUser.role = role;
+      deletedUser.status = status;
+      deletedUser.dob = dob;
+      deletedUser.metadata = metadata;
+      await deletedUser.save();
+      return res
+        .status(201)
+        .json({ message: "User created successfully", user: deletedUser });
+    }
+
     const user = new User({
       name,
       email,
