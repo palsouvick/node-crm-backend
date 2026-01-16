@@ -1,6 +1,10 @@
 const Campaign = require("../models/Campaign");
 const logActivity = require("../utils/logActivity");
 const CampaignRecipient = require("../models/CampaignRecipient");
+const Customer = require("../models/Customer");
+const sendEmail = require("../utils/sendEmail");
+const replaceVariables = require("../utils/replaceVariables");
+
 // Create a new campaign
 exports.createCampaign = async (req, res) => {
   try {
@@ -113,36 +117,48 @@ exports.getCampaignById = async (req, res) => {
     const campaign = await Campaign.findById(id)
       .populate("createdBy", "name email")
       .populate("customers", "name email")
-      .populate("leads", "name email")
       .populate("emailTemplate", "name subject body");
 
     if (!campaign || campaign.isDeleted) {
       return res.status(404).json({ message: "Campaign not found" });
     }
-    
+
     let recipients = await CampaignRecipient.find({ campaign: id })
-      .populate("recipientId")
+      .populate({
+        path: "recipientId",
+        select: "name email customer",
+      })
       .lean();
 
-    // populate Lead → Customer safely
-    await CampaignRecipient.populate(recipients, {
-      path: "recipientId.customar",
-      select: "name email",
-    });
+    // 🔥 only populate customer for LEAD recipients
+    for (let r of recipients) {
+      if (r.recipientType === "Lead" && r.recipientId?.customer) {
+        r.recipientId.customer = await Customer.findById(r.recipientId.customer)
+          .select("name email")
+          .lean();
+      }
+    }
 
-    const formattedRecipients = recipients.map((r) => ({
-      _id: r._id,
-      name:
-        r.recipientType === "Customer"
-          ? r.recipientId?.name
-          : r.recipientId?.customar?.name,
-      email:
-        r.recipientType === "Customer"
-          ? r.recipientId?.email
-          : r.recipientId?.customar?.email,
-      recipientType: r.recipientType.toLowerCase(),
-      status: r.status,
-    }));
+    const formattedRecipients = recipients.map((r) => {
+      if (r.recipientType === "Customer") {
+        return {
+          _id: r._id,
+          name: r.recipientId?.name,
+          email: r.recipientId?.email,
+          recipientType: "customer",
+          status: r.status,
+        };
+      }
+
+      // Lead → use customer info
+      return {
+        _id: r._id,
+        name: r.recipientId?.customer?.name,
+        email: r.recipientId?.customer?.email,
+        recipientType: "lead",
+        status: r.status,
+      };
+    });
 
     // Stats
     const stats = await CampaignRecipient.aggregate([
@@ -253,9 +269,17 @@ exports.updateCampaign = async (req, res) => {
 exports.startCampaign = async (req, res) => {
   try {
     const { id } = req.params;
-    const campaign = await Campaign.findById(id);
+    const campaign = await Campaign.findById(id).populate(
+      "emailTemplate"
+    );
     if (!campaign || campaign.isDeleted) {
       return res.status(404).json({ message: "Campaign not found" });
+    }
+
+    if (!campaign.emailTemplate?.subject || !campaign.emailTemplate?.body) {
+      return res.status(400).json({
+        message: "Email template subject or body is missing",
+      });
     }
 
     if (campaign.status === "running") {
@@ -273,13 +297,31 @@ exports.startCampaign = async (req, res) => {
 
     for (const recipient of recipients) {
       try {
-        const email = await getRecipientEmail(recipient);
-        if (!email) throw new Error("Email not found");
+        const user = recipient.recipientId;
+        if (!user?.email) throw new Error("Recipient email not found");
+
+        // 🔑 VARIABLE MAP (PER USER)
+        const variables = {
+          name: user.name,
+          email: user.email,
+          sender_name: req.user.name,
+          company_name: "CloudifyApps",
+        };
+
+        // 🔁 REPLACE VARIABLES
+        const subject = replaceVariables(
+          campaign.emailTemplate.subject,
+          variables
+        );
+
+        const body = replaceVariables(campaign.emailTemplate.body, variables);
+        console.log("FINAL SUBJECT:", subject);
+        console.log("FINAL BODY:", body);
 
         await sendEmail({
-          to: email,
-          subject: campaign.emailTemplate.subject,
-          html: campaign.emailTemplate.body,
+          to: user.email,
+          subject: subject,
+          html: body,
         });
 
         recipient.status = "sent";
@@ -298,7 +340,9 @@ exports.startCampaign = async (req, res) => {
       referenceId: campaign._id,
       description: `Started campaign: ${campaign.name}`,
     });
-    
+
+    campaign.status = "Completed";
+    await campaign.save();
     res
       .status(200)
       .json({ message: "Campaign started successfully", campaign });
@@ -310,10 +354,11 @@ exports.startCampaign = async (req, res) => {
 
 exports.sendTestEmail = async (req, res) => {
   try {
+    console.log("req -", req.body);
     const { id } = req.params;
-    const { testEmail } = req.body;
+    const { email } = req.body;
 
-    if (!testEmail) {
+    if (!email) {
       return res.status(400).json({ message: "Test email is required" });
     }
 
@@ -323,7 +368,7 @@ exports.sendTestEmail = async (req, res) => {
     }
 
     await sendEmail({
-      to: testEmail,
+      to: email,
       subject: campaign.emailTemplate.subject,
       html: campaign.emailTemplate.body,
     });
@@ -333,7 +378,7 @@ exports.sendTestEmail = async (req, res) => {
       action: "TEST_EMAIL",
       module: "campaign",
       referenceId: campaign._id,
-      description: `Sent test email to ${testEmail}`,
+      description: `Sent test email to ${email}`,
     });
 
     res.status(200).json({ message: "Test email sent successfully" });
@@ -342,4 +387,3 @@ exports.sendTestEmail = async (req, res) => {
     res.status(500).json({ message: "Failed to send test email" });
   }
 };
-

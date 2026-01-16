@@ -16,7 +16,7 @@ router.use(protect);
 router.post('/campaigns', authorize('admin'), createCampaign);
 router.get('/campaigns', authorize('admin'), getCampaigns);
 router.post('/campaigns/start/:id', authorize('admin'), startCampaign);
-router.post('/campaigns/send-test-mail/:id', authorize('admin'), sendTestEmail);
+router.post('/campaigns/send-test-email/:id', authorize('admin'), sendTestEmail);
 router.get('/campaigns/:id', authorize('admin'), getCampaignById);
 router.put('/campaigns/:id', authorize('admin'), updateCampaign);
 router.delete('/campaigns/:id', authorize('admin'), deleteCampaign);

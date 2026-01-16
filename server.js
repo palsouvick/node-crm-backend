@@ -1,6 +1,7 @@
+require("dotenv").config();
 const app = require("./src/app");
 const connectDB = require("./src/config/db");
-require("dotenv").config();
+
 
 connectDB();
 console.log("Starting server..."+process.env.PORT);
