@@ -220,3 +220,13 @@ exports.rescheduleFollowUp = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
+exports.totalFollowUps = async (req, res) => {
+  try {
+    const total = await FollowUp.countDocuments({ isDeleted: false });
+    res.json({ total });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server error" });
+  }
+};

@@ -71,8 +71,6 @@ exports.getCustomers = async (req, res) => {
         }
         const [customers, total] = await Promise.all([
             Customer.find(filter)
-            .populate("assignedTo", "name email")
-            .populate("createdBy", "name email")
             .sort({ createdAt: -1 })
             .skip(skip)
             .limit(limit),
@@ -117,7 +115,7 @@ exports.updateCustomer = async (req, res) => {
     }
 
     try {
-        const allowedFields = ["name", "email", "phone", "address", "status"];
+        const allowedFields = ["name", "email", "phone", "address", "status", "assignedTo"];
         const updates = {};
 
         allowedFields.forEach(field => {

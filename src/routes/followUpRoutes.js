@@ -6,13 +6,15 @@ const { createFollowUp,
     updateFollowUp,
     deleteFollowUp, 
     completeFollowUp, 
-    rescheduleFollowUp 
+    rescheduleFollowUp,
+    totalFollowUps
 } = require('../controllers/followUpController');
 const { protect, authorize } = require('../middlewares/authMiddleware');
 
 router.use(protect);
 router.post('/follow-ups', authorize('admin', 'sales', 'support'), createFollowUp);
 router.get('/follow-ups', getFollowUps);
+router.get('/follow-ups/count', totalFollowUps);
 router.get('/follow-ups/:id', getFollowUpById);
 router.put('/follow-ups/:id', authorize('admin', 'sales', 'support'), updateFollowUp);
 router.delete('/follow-ups/:id', authorize('admin'), deleteFollowUp);

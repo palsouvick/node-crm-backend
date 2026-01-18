@@ -1,11 +1,20 @@
 const mongoose = require("mongoose");
 const Lead = require("../models/Lead");
+const { Parser } = require("json2csv");
 
 // Create a new lead
 exports.createLead = async (req, res) => {
   try {
-    const { customer, title, description, status, expectedValue, assignedTo, remarks, source } =
-      req.body;
+    const {
+      customer,
+      title,
+      description,
+      status,
+      expectedValue,
+      assignedTo,
+      remarks,
+      source,
+    } = req.body;
     if (!customer) {
       return res.status(400).json({ message: "Name and email are required" });
     }
@@ -172,7 +181,7 @@ exports.assignLead = async (req, res) => {
     const lead = await Lead.findByIdAndUpdate(
       id,
       { assignedTo },
-      { new: true }
+      { new: true },
     );
     if (!lead) {
       return res.status(404).json({ message: "Lead not found" });
@@ -184,7 +193,7 @@ exports.assignLead = async (req, res) => {
   }
 };
 
-exports.totalLeads = async (req,res) => {
+exports.totalLeads = async (req, res) => {
   try {
     const total = await Lead.countDocuments();
     res.json({ total });
@@ -192,4 +201,154 @@ exports.totalLeads = async (req,res) => {
     console.error(error);
     res.status(500).json({ message: "Server error" });
   }
-}
+};
+
+// Get leads growth data (last 6 months)
+exports.getLeadsGrowth = async (req, res) => {
+  try {
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+
+    const leadsGrowth = await Lead.aggregate([
+      {
+        $match: {
+          isDeleted: false,
+          createdAt: { $gte: sixMonthsAgo },
+        },
+      },
+      {
+        $group: {
+          _id: {
+            year: { $year: "$createdAt" },
+            month: { $month: "$createdAt" },
+          },
+          count: { $sum: 1 },
+        },
+      },
+      {
+        $sort: { "_id.year": 1, "_id.month": 1 },
+      },
+      {
+        $project: {
+          _id: 0,
+          month: {
+            $let: {
+              vars: {
+                monthsInString: [
+                  "",
+                  "Jan",
+                  "Feb",
+                  "Mar",
+                  "Apr",
+                  "May",
+                  "Jun",
+                  "Jul",
+                  "Aug",
+                  "Sep",
+                  "Oct",
+                  "Nov",
+                  "Dec",
+                ],
+              },
+              in: { $arrayElemAt: ["$$monthsInString", "$_id.month"] },
+            },
+          },
+          leads: "$count",
+        },
+      },
+    ]);
+
+    res.json(leadsGrowth);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Get lead status distribution
+exports.getLeadStatus = async (req, res) => {
+  try {
+    const statusDistribution = await Lead.aggregate([
+      {
+        $match: { isDeleted: false },
+      },
+      {
+        $group: {
+          _id: "$status",
+          count: { $sum: 1 },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          name: {
+            $concat: [
+              { $toUpper: { $substrCP: ["$_id", 0, 1] } },
+              { $substrCP: ["$_id", 1, { $strLenCP: "$_id" }] },
+            ],
+          },
+          value: "$count",
+          color: {
+            $switch: {
+              branches: [
+                { case: { $eq: ["$_id", "new"] }, then: "#6366f1" },
+                { case: { $eq: ["$_id", "contacted"] }, then: "#10b981" },
+                { case: { $eq: ["$_id", "qualified"] }, then: "#f59e0b" },
+                { case: { $eq: ["$_id", "won"] }, then: "#8b5cf6" },
+                { case: { $eq: ["$_id", "lost"] }, then: "#ef4444" },
+              ],
+              default: "#6b7280",
+            },
+          },
+        },
+      },
+    ]);
+
+    res.json(statusDistribution);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+exports.exportLeadData = async (req, res) => {
+  try {
+    const leads = await Lead.find({ isDeleted: false })
+      .populate("customer", "name email phone")
+      .populate("assignedTo", "name email")
+      .populate("createdBy", "name email");
+
+    const leadsData = leads.map((lead) => ({
+      name: lead.customer.name,
+      email: lead.customer.email,
+      phone: lead.customer.phone,
+      status: lead.status,
+      source: lead.source,
+      assignedTo: lead.assignedTo ? lead.assignedTo.name : null,
+      createdBy: lead.createdBy ? lead.createdBy.name : null,
+      createdAt: lead.createdAt,
+    }));
+
+    const fields = [
+      { label: "Lead Name", value: "name" },
+      { label: "Email", value: "email" },
+      { label: "Phone", value: "phone" },
+      { label: "Status", value: "status" },
+      { label: "Source", value: "source" },
+      { label: "Assigned To", value: "assignedTo" },
+      { label: "Created By", value: "createdBy" },
+      { label: "Created At", value: "createdAt" },
+    ];
+
+    const parser = new Parser({ fields });
+    const csv = parser.parse(leadsData);
+
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader("Content-Disposition", "attachment; filename=leads.csv");
+
+    return res.status(200).send(csv);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
