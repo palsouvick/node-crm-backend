@@ -26,6 +26,7 @@ app.use('/api', require('./routes/userRoutes'));
 app.use('/api', require('./routes/campaignRoutes'));
 app.use('/api', require('./routes/EmailTemplateRoute'));
 app.use('/api', require('./routes/activityRoute'));
+app.use('/api', require('./routes/CompanyRoute'));
 
 app.get("/", (req, res) => {
   res.send("CRM Backend Running");

@@ -29,3 +29,13 @@ exports.getActivitys = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
+exports.totalActivityLog = async(req, res)=>{
+    try {
+        const total = await Activity.countDocuments();
+        res.json({ total });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Server error" });
+    }
+}

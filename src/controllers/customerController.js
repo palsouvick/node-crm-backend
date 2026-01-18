@@ -71,6 +71,7 @@ exports.getCustomers = async (req, res) => {
         }
         const [customers, total] = await Promise.all([
             Customer.find(filter)
+            .populate("assignedTo", "name email")
             .sort({ createdAt: -1 })
             .skip(skip)
             .limit(limit),
