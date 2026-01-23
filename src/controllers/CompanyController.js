@@ -94,6 +94,8 @@ exports.createCompany = async (req, res) => {
         phone,
         website,
         address,
+        state,
+        country,
         industry,
         companySize,
         description,
@@ -110,7 +112,6 @@ exports.createCompany = async (req, res) => {
             ? JSON.parse(assignedTo)
             : assignedTo || [],
         nextFollowUpDate,
-        owner: req.user._id,
       };
 
       // Add logo if uploaded
@@ -163,9 +164,10 @@ exports.getCompanies = async (req, res) => {
     const query = {
       isDeleted: false,
     };
-
+console.log("Search term:", search);
     // Search
     if (search) {
+      console.log("Search term:", search);
       query.$or = [
         { name: { $regex: search, $options: "i" } },
         { email: { $regex: search, $options: "i" } },
@@ -224,14 +226,9 @@ exports.getCompanyById = async (req, res) => {
   try {
     const company = await Company.findOne({
       _id: req.params.id,
-      owner: req.user._id,
       isDeleted: false,
     })
-      .populate("owner", "name email")
-      .populate("primaryContact", "firstName lastName email phone")
-      .populate("contacts", "firstName lastName email phone position")
-      .populate("assignedTo", "name email")
-      .populate("deals");
+      .populate("assignedTo", "name email");
 
     if (!company) {
       return res.status(404).json({
@@ -268,7 +265,6 @@ exports.updateCompany = async (req, res) => {
 
       const company = await Company.findOne({
         _id: req.params.id,
-        owner: req.user._id,
         isDeleted: false,
       });
 
@@ -285,19 +281,16 @@ exports.updateCompany = async (req, res) => {
         phone,
         website,
         address,
+        country,
+        state,
         industry,
         companySize,
-        annualRevenue,
-        foundedYear,
-        taxId,
         description,
         tags,
         status,
         type,
         socialMedia,
-        primaryContact,
         assignedTo,
-        customFields,
         nextFollowUpDate,
         lastContactedAt,
       } = req.body;
@@ -307,14 +300,9 @@ exports.updateCompany = async (req, res) => {
       if (email !== undefined) company.email = email;
       if (phone !== undefined) company.phone = phone;
       if (website !== undefined) company.website = website;
-      if (address)
-        company.address =
-          typeof address === "string" ? JSON.parse(address) : address;
+      if (address) company.address = address;
       if (industry) company.industry = industry;
       if (companySize) company.companySize = companySize;
-      if (annualRevenue !== undefined) company.annualRevenue = annualRevenue;
-      if (foundedYear) company.foundedYear = foundedYear;
-      if (taxId !== undefined) company.taxId = taxId;
       if (description !== undefined) company.description = description;
       if (tags)
         company.tags = typeof tags === "string" ? JSON.parse(tags) : tags;
@@ -325,16 +313,11 @@ exports.updateCompany = async (req, res) => {
           typeof socialMedia === "string"
             ? JSON.parse(socialMedia)
             : socialMedia;
-      if (primaryContact) company.primaryContact = primaryContact;
       if (assignedTo)
         company.assignedTo =
           typeof assignedTo === "string" ? JSON.parse(assignedTo) : assignedTo;
-      if (customFields)
-        company.customFields =
-          typeof customFields === "string"
-            ? JSON.parse(customFields)
-            : customFields;
-      if (nextFollowUpDate) company.nextFollowUpDate = nextFollowUpDate;
+      if(country) company.country = country;
+      if(state) company.state = state;
       if (lastContactedAt) company.lastContactedAt = lastContactedAt;
 
       // Update logo if new file uploaded
@@ -348,8 +331,6 @@ exports.updateCompany = async (req, res) => {
       await company.save();
 
       await company.populate([
-        { path: "owner", select: "name email" },
-        { path: "primaryContact", select: "firstName lastName email phone" },
         { path: "assignedTo", select: "name email" },
       ]);
 
@@ -374,7 +355,6 @@ exports.deleteCompany = async (req, res) => {
   try {
     const company = await Company.findOne({
       _id: req.params.id,
-      owner: req.user._id,
       isDeleted: false,
     });
 
@@ -385,7 +365,7 @@ exports.deleteCompany = async (req, res) => {
       });
     }
 
-    await company.softDelete(req.user._id);
+    await Company.softDelete(req.params.id, req.user._id);
 
     res.status(200).json({
       success: true,

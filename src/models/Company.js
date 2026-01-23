@@ -177,11 +177,17 @@ CompanySchema.statics.search = function (userId, searchTerm, filters = {}) {
 };
 
 // Method to soft delete
-CompanySchema.methods.softDelete = async function (userId) {
-  this.isDeleted = true;
-  this.deletedAt = new Date();
-  this.deletedBy = userId;
-  return this.save();
+// CompanySchema.statics.softDelete = async function (userId) {
+//   this.isDeleted = true;
+//   this.deletedAt = new Date();
+//   this.deletedBy = userId;
+//   return this.save();
+// };
+CompanySchema.statics.softDelete = async function (id, userId) {
+  return this.findByIdAndUpdate(id, {
+    isDeleted: true,
+    deletedAt: new Date(),
+    deletedBy: userId,
+  });
 };
-
 module.exports = mongoose.model("Company", CompanySchema);

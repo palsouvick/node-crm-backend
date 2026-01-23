@@ -7,12 +7,22 @@ exports.getUsers = async (req, res) => {
     const limit = Number(req.query.limit) || 5;
     const skip = (page - 1) * limit;
 
-    const { search } = req.query;
+    const { search, role, status } = req.query;
 
     // ✅ Base filter
     const filter = {
       $or: [{ isDeleted: false }, { isDeleted: { $exists: false } }],
     };
+
+    // ✅ Role filter
+    if (role) {
+      filter.role = role;
+    }
+
+    // ✅ Status filter
+    if (status) {
+      filter.status = status;
+    }
 
     // ✅ Search filter
     if (search) {
