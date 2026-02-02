@@ -29,14 +29,21 @@ exports.getFollowUps = async (req, res) => {
     const page = Number(req.query.page) || 1;
     const limit = Number(req.query.limit) || 10;
     const skip = (page - 1) * limit;
-    const { status, search } = req.query;
+    const { status, search, type , priority } = req.query;
     const filter = { isDeleted: false };
     // Status filter
     if (status) {
       filter.status = status;
     }
 
-    // Search filter
+    if (type) {
+      filter.type = type;
+    }
+
+    if( priority) {
+      filter.priority = priority;
+    }
+    
     // ⚠️ SEARCH (customer name)
     if (search) {
       filter.$or = [{ "customer.name": { $regex: search, $options: "i" } }];
@@ -69,7 +76,6 @@ exports.getFollowUps = async (req, res) => {
         totalPages: Math.ceil(total / limit),
       },
     });
-    res.json(followUps);
   } catch (error) {
     res.status(500).json({ message: "Server error" });
   }

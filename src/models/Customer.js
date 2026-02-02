@@ -9,7 +9,8 @@ const CustomerSchema = new mongoose.Schema({
     assignedTo: {type: mongoose.Schema.Types.ObjectId, ref: 'User', required: false,},
     createdBy: {type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true,},
     notes: {type: String, required: false,},
-    isDeleted: {type: Boolean, default: false,}
+    isDeleted: {type: Boolean, default: false,},
+    isLead: {type: Boolean, default: false,},
 }, {timestamps: true});
 
 module.exports = mongoose.model("Customer", CustomerSchema);
