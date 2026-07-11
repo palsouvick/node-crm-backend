@@ -142,13 +142,24 @@ exports.verifyOtp = async (req, res) => {
 }
 
 exports.changePassword = async (req, res) => {
-  const { email, newPassword } = req.body;
+  const { email, otp, newPassword } = req.body;
   try {
-    const user = await User.findOne({email});
+    if (!otp) {
+      return res.status(400).json({ message: "OTP is required" });
+    }
+    const user = await User.findOne({ email });
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
+    if (!user.resetOtp || !user.resetOtpExpires || user.resetOtpExpires < Date.now()) {
+      return res.status(400).json({ message: "OTP has expired" });
+    }
+    if (user.resetOtp !== otp) {
+      return res.status(400).json({ message: "Invalid OTP" });
+    }
     user.password = await bcrypt.hash(newPassword, 10);
+    user.resetOtp = undefined;
+    user.resetOtpExpires = undefined;
     await user.save();
     res.json({ message: "Password changed successfully" });
   } catch (error) {

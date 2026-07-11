@@ -7,14 +7,12 @@ exports.protect = async (req, res, next) => {
     return res.status(401).json({ message: "Not authorized" });
   }
   let token = authHeader.split(" ")[1];
-  console.log("TOKEN:", token);
   if (!token) {
     return res.status(401).json({ message: "Not authorized" });
   }
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    console.log("DECODED TOKEN:", decoded);
 
     const user = await User.findById(decoded.userId).select("-password");
     if (!user || user.status !== 'active') {

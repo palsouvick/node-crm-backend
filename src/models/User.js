@@ -8,7 +8,7 @@ const UserSchema = new mongoose.Schema(
     phone: { type: String, required: false, unique: true },
     password: { type: String, required: true },
     status: { type: String, default: "active" },
-    role: { type: String, default: "admin" },
+    role: { type: String, default: "user" },
     dob: { type: Date, required: false },
     metadata: { type: Object, required: false },
     lastLogin: {
