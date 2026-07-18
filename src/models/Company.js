@@ -112,6 +112,12 @@ const CompanySchema = new mongoose.Schema(
       type: Date,
     },
 
+    annualRevenue: {
+      type: Number,
+      required: false,
+      default: 0,
+    },
+
     isDeleted: {
       type: Boolean,
       default: false,
@@ -131,32 +137,15 @@ const CompanySchema = new mongoose.Schema(
   },
 );
 
-// Indexes for better query performance
-CompanySchema.index({ name: 1, owner: 1 });
+// Indexes for better query performance (name already indexed via the field's index:true above)
 CompanySchema.index({ email: 1 });
 CompanySchema.index({ status: 1, isDeleted: 1 });
 CompanySchema.index({ tags: 1 });
 CompanySchema.index({ createdAt: -1 });
 
-// Virtual for total contacts
-CompanySchema.virtual("totalContacts", {
-  ref: "Contact",
-  localField: "_id",
-  foreignField: "company",
-  count: true,
-});
-
-// Virtual for deals
-CompanySchema.virtual("deals", {
-  ref: "Deal",
-  localField: "_id",
-  foreignField: "company",
-});
-
 // Static method to search companies
-CompanySchema.statics.search = function (userId, searchTerm, filters = {}) {
+CompanySchema.statics.search = function (searchTerm, filters = {}) {
   const query = {
-    owner: userId,
     isDeleted: false,
   };
 
@@ -177,12 +166,6 @@ CompanySchema.statics.search = function (userId, searchTerm, filters = {}) {
 };
 
 // Method to soft delete
-// CompanySchema.statics.softDelete = async function (userId) {
-//   this.isDeleted = true;
-//   this.deletedAt = new Date();
-//   this.deletedBy = userId;
-//   return this.save();
-// };
 CompanySchema.statics.softDelete = async function (id, userId) {
   return this.findByIdAndUpdate(id, {
     isDeleted: true,

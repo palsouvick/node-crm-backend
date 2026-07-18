@@ -2,12 +2,10 @@ const mongoose = require("mongoose");
 
 const CampaignRecipientScheme = new mongoose.Schema(
   {
-    campaign: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Campaign",
-      },
-    ],
+    campaign: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Campaign",
+    },
     recipientId: {
       type: mongoose.Schema.Types.ObjectId,
       required: true,
@@ -20,6 +18,7 @@ const CampaignRecipientScheme = new mongoose.Schema(
     },
     status: {
       type: String,
+      enum: ["pending", "sent", "opened", "clicked", "bounced", "unsubscribed", "failed"],
       default: "pending",
     },
     sentAt: {
@@ -37,5 +36,8 @@ const CampaignRecipientScheme = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+CampaignRecipientScheme.index({ campaign: 1, status: 1 });
+CampaignRecipientScheme.index({ recipientId: 1, recipientType: 1 });
 
 module.exports = mongoose.model("CampaignRecipient", CampaignRecipientScheme);

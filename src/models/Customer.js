@@ -5,6 +5,7 @@ const CustomerSchema = new mongoose.Schema({
     email: {type: String, required: true, unique: true, index: true,lowercase: true,trim: true},
     phone: {type: String, required: false, unique: true,},
     company: {type: String, required: false,},
+    companyRef: {type: mongoose.Schema.Types.ObjectId, ref: 'Company', required: false, index: true},
     status: {type: String, default: 'active'},
     assignedTo: {type: mongoose.Schema.Types.ObjectId, ref: 'User', required: false,},
     createdBy: {type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true,},

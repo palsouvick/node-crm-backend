@@ -1,6 +1,11 @@
 const Company = require("../models/Company");
+const Customer = require("../models/Customer");
+const Lead = require("../models/Lead");
 const multer = require("multer");
 const path = require("path");
+const { Parser } = require("json2csv");
+
+const OPEN_LEAD_STATUSES = { $nin: ["won", "lost"] };
 
 // Configure multer for logo upload
 const storage = multer.diskStorage({
@@ -52,6 +57,8 @@ exports.createCompany = async (req, res) => {
         phone,
         website,
         address,
+        state,
+        country,
         industry,
         companySize,
         description,
@@ -73,10 +80,9 @@ exports.createCompany = async (req, res) => {
         });
       }
 
-      // Check for duplicate company name for this user
+      // Check for duplicate company name
       const existingCompany = await Company.findOne({
         name: { $regex: new RegExp(`^${name}$`, "i") },
-        owner: req.user._id,
         isDeleted: false,
       });
 
@@ -155,6 +161,11 @@ exports.getCompanies = async (req, res) => {
       industry,
       companySize,
       tags,
+      country,
+      state,
+      assignedTo,
+      dateFrom,
+      dateTo,
       sortBy = "updatedAt",
       sortOrder = "desc",
       page = 1,
@@ -164,10 +175,9 @@ exports.getCompanies = async (req, res) => {
     const query = {
       isDeleted: false,
     };
-console.log("Search term:", search);
+
     // Search
     if (search) {
-      console.log("Search term:", search);
       query.$or = [
         { name: { $regex: search, $options: "i" } },
         { email: { $regex: search, $options: "i" } },
@@ -181,9 +191,17 @@ console.log("Search term:", search);
     if (type) query.type = type;
     if (industry) query.industry = industry;
     if (companySize) query.companySize = companySize;
+    if (country) query.country = country;
+    if (state) query.state = state;
+    if (assignedTo) query.assignedTo = assignedTo;
     if (tags) {
       const tagArray = typeof tags === "string" ? tags.split(",") : tags;
       query.tags = { $in: tagArray };
+    }
+    if (dateFrom || dateTo) {
+      query.createdAt = {};
+      if (dateFrom) query.createdAt.$gte = new Date(dateFrom);
+      if (dateTo) query.createdAt.$lte = new Date(dateTo);
     }
 
     // Sorting
@@ -200,10 +218,38 @@ console.log("Search term:", search);
         .limit(parseInt(limit)),
       Company.countDocuments(query),
     ]);
-    console.log(companies);
+
+    const companyIds = companies.map((c) => c._id);
+    const linkedCustomers = await Customer.find({
+      isDeleted: false,
+      companyRef: { $in: companyIds },
+    }).select("_id companyRef");
+
+    const customerToCompany = Object.fromEntries(
+      linkedCustomers.map((c) => [c._id.toString(), c.companyRef.toString()])
+    );
+    const linkedCustomerIds = linkedCustomers.map((c) => c._id);
+
+    const openLeadCounts = await Lead.aggregate([
+      { $match: { isDeleted: false, status: OPEN_LEAD_STATUSES, customer: { $in: linkedCustomerIds } } },
+      { $group: { _id: "$customer", count: { $sum: 1 } } },
+    ]);
+
+    const openLeadsByCompany = {};
+    openLeadCounts.forEach((row) => {
+      const companyId = customerToCompany[row._id.toString()];
+      if (!companyId) return;
+      openLeadsByCompany[companyId] = (openLeadsByCompany[companyId] || 0) + row.count;
+    });
+
+    const companiesWithCounts = companies.map((company) => ({
+      ...company.toObject(),
+      openLeadsCount: openLeadsByCompany[company._id.toString()] || 0,
+    }));
+
     res.status(200).json({
       success: true,
-      data: companies,
+      data: companiesWithCounts,
       pagination: {
         total,
         page: parseInt(page),
@@ -396,7 +442,6 @@ exports.bulkDeleteCompanies = async (req, res) => {
     const result = await Company.updateMany(
       {
         _id: { $in: ids },
-        owner: req.user._id,
         isDeleted: false,
       },
       {
@@ -421,82 +466,184 @@ exports.bulkDeleteCompanies = async (req, res) => {
   }
 };
 
-// GET Company Statistics
-exports.getCompanyStats = async (req, res) => {
+// GET /company/summary
+exports.getCompanySummary = async (req, res) => {
   try {
-    const stats = await Company.aggregate([
-      {
-        $match: {
-          owner: req.user._id,
-          isDeleted: false,
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+
+    const [total, active, prospect, inactive, newThisMonth, openDealRows] = await Promise.all([
+      Company.countDocuments({ isDeleted: false }),
+      Company.countDocuments({ isDeleted: false, status: "active" }),
+      Company.countDocuments({ isDeleted: false, status: "prospect" }),
+      Company.countDocuments({ isDeleted: false, status: "inactive" }),
+      Company.countDocuments({ isDeleted: false, createdAt: { $gte: startOfMonth } }),
+      Customer.aggregate([
+        { $match: { isDeleted: false, companyRef: { $ne: null } } },
+        {
+          $lookup: {
+            from: "leads",
+            let: { custId: "$_id" },
+            pipeline: [
+              {
+                $match: {
+                  $expr: { $eq: ["$customer", "$$custId"] },
+                  isDeleted: false,
+                  status: OPEN_LEAD_STATUSES,
+                },
+              },
+              { $limit: 1 },
+            ],
+            as: "openLeads",
+          },
         },
-      },
-      {
-        $facet: {
-          byStatus: [
-            {
-              $group: {
-                _id: "$status",
-                count: { $sum: 1 },
-              },
-            },
-          ],
-          byType: [
-            {
-              $group: {
-                _id: "$type",
-                count: { $sum: 1 },
-              },
-            },
-          ],
-          byIndustry: [
-            {
-              $group: {
-                _id: "$industry",
-                count: { $sum: 1 },
-              },
-            },
-          ],
-          bySize: [
-            {
-              $group: {
-                _id: "$companySize",
-                count: { $sum: 1 },
-              },
-            },
-          ],
-          totalRevenue: [
-            {
-              $group: {
-                _id: null,
-                total: { $sum: "$annualRevenue" },
-                average: { $avg: "$annualRevenue" },
-              },
-            },
-          ],
-        },
-      },
+        { $match: { "openLeads.0": { $exists: true } } },
+        { $group: { _id: "$companyRef" } },
+        { $count: "count" },
+      ]),
     ]);
 
-    const total = await Company.countDocuments({
-      owner: req.user._id,
-      isDeleted: false,
-    });
-
-    res.status(200).json({
+    res.json({
       success: true,
       data: {
         total,
-        ...stats[0],
+        active,
+        prospect,
+        inactive,
+        newThisMonth,
+        companiesWithOpenDeals: openDealRows[0]?.count || 0,
       },
     });
   } catch (error) {
-    console.error("Get company stats error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Server Error",
-      error: error.message,
-    });
+    console.error("Get company summary error:", error);
+    res.status(500).json({ success: false, message: "Server Error", error: error.message });
+  }
+};
+
+// GET /company/filter-options
+exports.getCompanyFilterOptions = async (req, res) => {
+  try {
+    const [countries, states, tags] = await Promise.all([
+      Company.distinct("country", { isDeleted: false, country: { $nin: [null, ""] } }),
+      Company.distinct("state", { isDeleted: false, state: { $nin: [null, ""] } }),
+      Company.distinct("tags", { isDeleted: false }),
+    ]);
+    res.json({ success: true, data: { countries, states, tags } });
+  } catch (error) {
+    console.error("Get company filter options error:", error);
+    res.status(500).json({ success: false, message: "Server Error", error: error.message });
+  }
+};
+
+// GET /company/export
+exports.exportCompanyData = async (req, res) => {
+  try {
+    const { search, status, type, industry, companySize, country, state, tags, dateFrom, dateTo, ids } =
+      req.query;
+
+    const query = { isDeleted: false };
+    if (status) query.status = status;
+    if (type) query.type = type;
+    if (industry) query.industry = industry;
+    if (companySize) query.companySize = companySize;
+    if (country) query.country = country;
+    if (state) query.state = state;
+    if (tags) {
+      const tagArray = typeof tags === "string" ? tags.split(",") : tags;
+      query.tags = { $in: tagArray };
+    }
+    if (dateFrom || dateTo) {
+      query.createdAt = {};
+      if (dateFrom) query.createdAt.$gte = new Date(dateFrom);
+      if (dateTo) query.createdAt.$lte = new Date(dateTo);
+    }
+    if (ids) query._id = { $in: ids.split(",") };
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: "i" } },
+        { email: { $regex: search, $options: "i" } },
+        { phone: { $regex: search, $options: "i" } },
+        { description: { $regex: search, $options: "i" } },
+      ];
+    }
+
+    const companies = await Company.find(query).populate("assignedTo", "name");
+    const rows = companies.map((c) => ({
+      name: c.name,
+      email: c.email,
+      phone: c.phone,
+      website: c.website,
+      industry: c.industry,
+      companySize: c.companySize,
+      annualRevenue: c.annualRevenue,
+      state: c.state,
+      country: c.country,
+      status: c.status,
+      type: c.type,
+      assignedOwners: c.assignedTo.map((u) => u.name).join("; "),
+      tags: c.tags.join("; "),
+      createdAt: c.createdAt,
+    }));
+
+    const fields = [
+      { label: "Name", value: "name" },
+      { label: "Email", value: "email" },
+      { label: "Phone", value: "phone" },
+      { label: "Website", value: "website" },
+      { label: "Industry", value: "industry" },
+      { label: "Company Size", value: "companySize" },
+      { label: "Annual Revenue", value: "annualRevenue" },
+      { label: "State", value: "state" },
+      { label: "Country", value: "country" },
+      { label: "Status", value: "status" },
+      { label: "Type", value: "type" },
+      { label: "Assigned Owners", value: "assignedOwners" },
+      { label: "Tags", value: "tags" },
+      { label: "Created At", value: "createdAt" },
+    ];
+    const parser = new Parser({ fields });
+    const csv = parser.parse(rows);
+
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader("Content-Disposition", "attachment; filename=companies.csv");
+    res.status(200).send(csv);
+  } catch (error) {
+    console.error("Export company data error:", error);
+    res.status(500).json({ success: false, message: "Server Error", error: error.message });
+  }
+};
+
+// POST /company/bulk-status  { ids, status }
+exports.bulkUpdateCompanyStatus = async (req, res) => {
+  try {
+    const { ids, status } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0 || !status) {
+      return res.status(400).json({ success: false, message: "ids and status are required" });
+    }
+    await Company.updateMany({ _id: { $in: ids }, isDeleted: false }, { $set: { status } });
+    res.json({ success: true, message: "Companies updated successfully" });
+  } catch (error) {
+    console.error("Bulk update company status error:", error);
+    res.status(500).json({ success: false, message: "Server Error", error: error.message });
+  }
+};
+
+// POST /company/bulk-assign-owner  { ids, ownerIds }
+exports.bulkAssignCompanyOwner = async (req, res) => {
+  try {
+    const { ids, ownerIds } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0 || !Array.isArray(ownerIds)) {
+      return res.status(400).json({ success: false, message: "ids and ownerIds are required" });
+    }
+    await Company.updateMany(
+      { _id: { $in: ids }, isDeleted: false },
+      { $set: { assignedTo: ownerIds } }
+    );
+    res.json({ success: true, message: "Owners assigned successfully" });
+  } catch (error) {
+    console.error("Bulk assign company owner error:", error);
+    res.status(500).json({ success: false, message: "Server Error", error: error.message });
   }
 };
 

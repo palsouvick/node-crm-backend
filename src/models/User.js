@@ -10,6 +10,11 @@ const UserSchema = new mongoose.Schema(
     status: { type: String, default: "active" },
     role: { type: String, default: "user" },
     dob: { type: Date, required: false },
+    employeeId: { type: String, required: false, unique: true, sparse: true },
+    department: { type: String, required: false },
+    designation: { type: String, required: false },
+    joiningDate: { type: Date, required: false },
+    address: { type: String, required: false },
     metadata: { type: Object, required: false },
     lastLogin: {
       type: Date,
